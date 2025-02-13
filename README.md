@@ -1,2 +1,2 @@
 # Trading-bots
-Trading Bots made with Python.
+Cryptocurrency automated bot using Telegram and Binance API.
