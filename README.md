@@ -3,5 +3,12 @@ Cryptocurrency automated bot using Telegram and Binance API. Loads custom strate
 
 # Overview
 
+# Dependencies
+- yfinance
+- pandas
+- numpy
+- matplotlib
+- ta
 
+  # Instructions
 
