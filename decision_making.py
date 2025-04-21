@@ -3,13 +3,10 @@ import time, json, os
 import pandas as pd
 from binance.client import Client
 
-#entorno? no hace falta, tengo todo en la misma carpeta.
-
-#clase binance --------
 class BinanceClass(object):
     def __init__(self):
         api_key = API_KEY #Insert your Binance API-Key
-        secret =  SECRET  #other Binance value.
+        secret =  SECRET  #Binance Secret.
         self.client = Client(api_key,secret)
 
     def get_env_verify(self, var):
@@ -18,8 +15,9 @@ class BinanceClass(object):
         return var
 
     def get_account(self):
+        '''Get assets info of values above 0'''
         arr = [x for x in self.client.get_account()["balances"] if float(x["free"]) > 0]
-        df = pd.DataFrame.from_dict(arr).set_index("asset") #aca decia "self_index"
+        df = pd.DataFrame.from_dict(arr).set_index("asset") 
         print(df)
         return df
 
