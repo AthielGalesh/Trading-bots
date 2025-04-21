@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 
 
-#aca lo hago manualmente y fue que tanto
+#CREDENTIALS
 BOT_TOKEN = Telegram_bot_token #Place your telegram values here
 CHAT_ID = Chat_id_value
 
@@ -20,3 +20,9 @@ class Telegram_Mensaje:
         final_url = telegram_url + bot_path + chat_url + text_url
         response = requests.get(final_url)
         assert response.status_code == 200
+
+#you can also check your device if you are running your own server, for example:
+while True:
+    time.sleep(5)
+    msg = "the cpu usage is {}%".format(psutil.cpu_percent(interval=4))
+    send_telegram(msg)
