@@ -1,84 +1,126 @@
-#librerias -------------
-import time, json, os
+import schedule
+import time
+import datetime
+
 import pandas as pd
-from binance.client import Client
+import yfinance as yf
+import matplotlib.pyplot as plt
 
-class BinanceClass(object):
+from threading import Thread as th
+from ta.utils import dropna
+from contextlib import suppress
+
+import ta # for tech analysis
+import threading
+
+# Threaded function snippet, for multiple strategies running at once.
+def threaded(fn):
+    def wrapper(*args, **kwargs):
+        threading.Thread(target=fn, args=args, kwargs=kwargs).start()
+    return wrapper
+
+
+class Indicators(object):
     def __init__(self):
-        api_key = API_KEY #Insert your Binance API-Key
-        secret =  SECRET  #Binance Secret.
-        self.client = Client(api_key,secret)
-
-    def get_env_verify(self, var):
-        var = os.getenv()
-        assert var is not None, f"var {var} is none"
-        return var
-
-    def get_account(self):
-        '''Get assets info of values above 0'''
-        arr = [x for x in self.client.get_account()["balances"] if float(x["free"]) > 0]
-        df = pd.DataFrame.from_dict(arr).set_index("asset") 
-        print(df)
+        self.data = None
+    
+    def cseries(self, arr):
+        return pd.Series(arr)
+    
+    def get_last(self, data=None, window=2):
+        
+        if data is None:
+            data = self.data.Close
+            
+        return data[-window]
+    
+    def get_rsi(self):
+        close = self.data.Close
+        return ta.momentum.RSIIndicator(close).rsi()
+    
+    def get_macd(self):
+        close = self.data.Close
+        macd = ta.trend.MACD(close).macd()
+        return macd
+    
+class RSIstrategy(Indicators):
+    def __init__(self, letter='BTC-USD'):
+        super().__init__()
+        # basic parameters
+        self.buy_price = 0
+        self.letter = letter
+        self.position = False
+        self.interval = '15m'
+        self.period = '1d'
+        self.stop_level, self.profit_level = 1, 1
+        
+        # custom parameters
+        self.RRR            = 1.6
+        self.STOP_AMOUNT    = 735
+        
+        self.rsi_value = 30
+        self.stop_price = 190000
+        
+    def load_data(self):
+        df = yf.download(
+            self.letter,
+            period = self.period,
+            interval = self.interval,
+            progress = False
+            )
         return df
-
-    def test_order(self):
-        test = self.client.create_test_order(symbol = "BTCUSDT", side ="BUY", type="MARKET", quoteOrderQty = 10)
-        return test
-
-    def get_asset(self, asset):
-        df = self.get_account()
-        try:
-            result = df.loc[asset]["free"]
-        except:
-            result = 0
-        return float(result)
-
-    def round_down(self, amount, coin):
-        amount = float(amount)
-        info = self.client.futures_index_info(f"{coin}USDT")
-        step_size = [
-            float(_["stepSize"]) for _ in \
-            info["filters"] if _["filterType"] == "LOT_SIZE"][0]
-        amount // step_size * step_size
-        return amount
-
-
-
-
-def real_order(self, side="SELL", asset="BTC"):
-    try:
-        symbol = f"{asset}USDT"
-        if side == "BUY":
-            usdt  = self.get_asset("USDT")
-            price = float(self.client.get_symbol_ticker(symbol=f"{asset}USDT")["price"])
-            qtty = usdt/price
-            qtty = round(0.09*qtty, 8)
-            qtty = int(qtty)
-            order = self.client.order_market_buy(
-                symbol=symbol,
-                quantity=qtty
-            )
-        elif side == "SELL":
-            qtty_btc = self.get_asset(asset)
-            price = float(self.client.get_symbol_ticker(symbol=f"{asset}USDT")["price"])
-            qtty_dollar = qtty_btc * price
-            qtty = round(qtty_dollar, 6) # dollar round to 6
-            order = self.client.order_market_sell(
-                symbol=symbol,
-                quantity=qtty
-            )
+    
+    def strategy(self):
+        # load data
+        self.data = self.load_data()
+        last = self.get_last()
+        
+        # look for conditions
+        if not self.position:
+            last_rsi = self.get_last(data=self.get_rsi())
+            
+            # conditions
+            condA = last_rsi < self.rsi_value
+            condB = last < self.stop_price
+            
+            print(last_rsi, last)
+            if condA and condB:   
+                self.buy()
+                self.stop_level, self.profit_level = self.get_sl_tp()
+                msg = f"stop_level = {self.stop_level} \n\
+                    profit_level = {self.profit_level}"
+                print(msg)
+            else:
+                print('waiting conditions...')
+                
+        # look for exits
         else:
-            raise ValueError('choice not possible')
+            if last > self.profit_level or last < self.stop_level: # exit conditions
+                self.close()
+            else:
+                print('waiting tp / sl')
 
+    def buy(self):
+        print('buy')
+        self.buy_price = self.get_last()
+        self.position = True
+    
+    def close(self):
+        print('closing position')
+        self.position = False
+        
+    def get_sl_tp(self):
+        stop_level = self.buy_price - self.STOP_AMOUNT
+        profit_level = self.RRR*(self.buy_price-stop_level)+self.buy_price
+        return stop_level, profit_level
+    
+    @threaded
+    def run_strategy(self):
+        while True:
+            try:
+                self.strategy()
+                time.sleep(4)
+            except Exception as e:
+                print(e)
+                
 
-
-        return order
-
-    except Exception as e:
-        print(e)
-        return e
-
-#test ----
-binance = BinanceClass()
-binance.get_account()
-binance.test_order()
