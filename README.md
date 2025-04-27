@@ -18,6 +18,8 @@ This bot is structured as a development template, making it easy to extend with 
 # Structure:
 main.py: Main file to run the trading bot.
 
+globals.py: for general constants. Load credentials or whatever you feel useful.
+
 binance.py: Module for handling Binance API.
 
 telegram.py: Module for sending messages via Telegram.
